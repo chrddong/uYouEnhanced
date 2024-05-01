@@ -6,7 +6,6 @@
 @property (strong, nonatomic) UITableView *tableView;
 @property (strong, nonatomic) NSArray<NSString *> *appIcons;
 @property (assign, nonatomic) NSInteger selectedIconIndex;
-@property (strong, nonatomic) UIImageView *backButton;
 
 @end
 
@@ -16,7 +15,7 @@
     [super viewDidLoad];
 
     self.title = @"Change App Icon";
-    [self.navigationController.navigationBar setTitleTextAttributes:@{NSFontAttributeName: [UIFont fontWithName:@"YTSans-Bold" size:17], NSForegroundColorAttributeName: [UIColor whiteColor]}];
+    [self.navigationController.navigationBar setTitleTextAttributes:@{NSFontAttributeName: [UIFont fontWithName:@"YTSans-Bold" size:22], NSForegroundColorAttributeName: [UIColor whiteColor]}];
 
     self.selectedIconIndex = -1;
     
@@ -25,21 +24,18 @@
     self.tableView.delegate = self;
     [self.view addSubview:self.tableView];
 
-    UIBarButtonItem *backButton = [[UIBarButtonItem alloc] initWithTitle:@"" style:UIBarButtonItemStylePlain target:self action:@selector(back)];
-    UIImage *backImage = [UIImage imageNamed:@"yt_outline_chevron_left_ios_24pt" inBundle:[NSBundle mainBundle] compatibleWithTraitCollection:nil];
-    if (!backImage) {
-        backButton.image = [UIImage systemImageNamed:@"chevron.backward"];
-    } else {
-        backButton.image = backImage;
-    }
-    [backButton setTitleTextAttributes:@{NSForegroundColorAttributeName: [UIColor whiteColor], NSFontAttributeName: [UIFont fontWithName:@"YTSans-Medium" size:17]} forState:UIControlStateNormal];
-    self.navigationItem.leftBarButtonItem = backButton;
+    self.backButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [self.backButton setImage:[UIImage imageNamed:@"Back.png" inBundle:[NSBundle mainBundle] compatibleWithTraitCollection:nil] forState:UIControlStateNormal];
+    [self.backButton addTarget:self action:@selector(back) forControlEvents:UIControlEventTouchUpInside];
+    [self.backButton setFrame:CGRectMake(0, 0, 24, 24)];
+    UIBarButtonItem *customBackButton = [[UIBarButtonItem alloc] initWithCustomView:self.backButton];
+    self.navigationItem.leftBarButtonItem = customBackButton;
 
-    UIBarButtonItem *resetButton = [[UIBarButtonItem alloc] initWithTitle:@"Reset" style:UIBarButtonItemStylePlain target:self action:@selector(resetIcon)];
-    [resetButton setTitleTextAttributes:@{NSForegroundColorAttributeName: [UIColor whiteColor], NSFontAttributeName: [UIFont fontWithName:@"YTSans-Medium" size:17]} forState:UIControlStateNormal];
+    UIColor *buttonColor = [UIColor colorWithRed:203.0/255.0 green:22.0/255.0 blue:51.0/255.0 alpha:1.0];
+    UIBarButtonItem *resetButton = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"arrow.clockwise.circle.fill"] style:UIBarButtonItemStylePlain target:self action:@selector(resetIcon)];
     
     UIBarButtonItem *saveButton = [[UIBarButtonItem alloc] initWithTitle:@"Save" style:UIBarButtonItemStylePlain target:self action:@selector(saveIcon)];
-    [saveButton setTitleTextAttributes:@{NSForegroundColorAttributeName: [UIColor whiteColor], NSFontAttributeName: [UIFont fontWithName:@"YTSans-Medium" size:17]} forState:UIControlStateNormal];
+    [saveButton setTitleTextAttributes:@{NSForegroundColorAttributeName: buttonColor, NSFontAttributeName: [UIFont fontWithName:@"YTSans-Medium" size:17]} forState:UIControlStateNormal];
     
     self.navigationItem.rightBarButtonItems = @[saveButton, resetButton];
     
@@ -73,7 +69,9 @@
     cell.imageView.image = iconImage;
     cell.imageView.layer.cornerRadius = 10.0;
     cell.imageView.clipsToBounds = YES;
-        
+    cell.imageView.frame = CGRectMake(10, 10, 40, 40);
+    cell.textLabel.frame = CGRectMake(60, 10, self.view.frame.size.width - 70, 40);
+    
     if (indexPath.row == self.selectedIconIndex) {
         cell.accessoryType = UITableViewCellAccessoryCheckmark;
     } else {
@@ -104,27 +102,44 @@
 }
 
 - (void)saveIcon {
-    NSString *selectedIconPath = self.selectedIconIndex >= 0 ? self.appIcons[self.selectedIconIndex] : nil;
-    if (selectedIconPath) {
-        NSURL *iconURL = [NSURL fileURLWithPath:selectedIconPath];
-        if ([[UIApplication sharedApplication] respondsToSelector:@selector(setAlternateIconName:completionHandler:)]) {
-            [[UIApplication sharedApplication] setAlternateIconName:selectedIconPath completionHandler:^(NSError * _Nullable error) {
-                if (error) {
-                    NSLog(@"Error setting alternate icon: %@", error.localizedDescription);
-                    [self showAlertWithTitle:@"Error" message:@"Failed to set alternate icon"];
-                } else {
-                    NSLog(@"Alternate icon set successfully");
-                    [self showAlertWithTitle:@"Success" message:@"Alternate icon set successfully"];
-                }
-            }];
-        } else {
-            NSMutableDictionary *dict = [NSMutableDictionary dictionary];
-            [dict setObject:iconURL forKey:@"iconURL"];
-            [dict writeToFile:[[NSBundle mainBundle] pathForResource:@"Info" ofType:@"plist"] atomically:YES];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSString *selectedIcon = self.selectedIconIndex >= 0 ? self.appIcons[self.selectedIconIndex] : nil;
+        if (selectedIcon) {
+            NSString *iconName = [selectedIcon.lastPathComponent stringByDeletingPathExtension];
+            NSString *plistPath = [[NSBundle mainBundle] pathForResource:@"Info" ofType:@"plist"];
+            NSMutableDictionary *infoDict = [NSMutableDictionary dictionaryWithContentsOfFile:plistPath];
+            NSMutableDictionary *iconsDict = [infoDict objectForKey:@"CFBundleIcons"];
             
-            [self showAlertWithTitle:@"Alternate Icon" message:@"Please restart the app to apply the alternate icon"];
+            if (iconsDict) {
+                NSMutableDictionary *primaryIconDict = [iconsDict objectForKey:@"CFBundlePrimaryIcon"];
+                if (primaryIconDict) {
+                    NSMutableArray *iconFiles = [primaryIconDict objectForKey:@"CFBundleIconFiles"];
+                    [iconFiles addObject:iconName];
+                    primaryIconDict[@"CFBundleIconFiles"] = iconFiles;
+                }
+                [infoDict setObject:iconsDict forKey:@"CFBundleIcons"];
+                [infoDict writeToFile:plistPath atomically:YES];
+                
+                [[UIApplication sharedApplication] setAlternateIconName:iconName completionHandler:^(NSError * _Nullable error) {
+                    if (error) {
+                        NSLog(@"Error setting alternate icon: %@", error.localizedDescription);
+                        [self showAlertWithTitle:@"Error" message:@"Failed to set alternate icon"];
+                    } else {
+                        NSLog(@"Alternate icon set successfully");
+                        [self showAlertWithTitle:@"Success" message:@"Alternate icon set successfully"];
+                        
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            [self.tableView reloadData];
+                        });
+                    }
+                }];
+            } else {
+                NSLog(@"CFBundleIcons key not found in Info.plist");
+            }
+        } else {
+            NSLog(@"Selected icon path is nil");
         }
-    }
+    });
 }
 
 - (void)showAlertWithTitle:(NSString *)title message:(NSString *)message {
