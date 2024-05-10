@@ -25,18 +25,26 @@
     [self.view addSubview:self.tableView];
 
     self.backButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [self.backButton setImage:[UIImage imageNamed:@"Back.png" inBundle:[NSBundle mainBundle] compatibleWithTraitCollection:nil] forState:UIControlStateNormal];
+    NSBundle *backIcon = [NSBundle bundleWithPath:[[NSBundle mainBundle] pathForResource:@"uYouPlus" ofType:@"bundle"]];
+    UIImage *backImage = [UIImage imageNamed:@"Back.png" inBundle:backIcon compatibleWithTraitCollection:nil];
+    backImage = [self resizeImage:backImage newSize:CGSizeMake(24, 24)];
+    backImage = [backImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    [self.backButton setTintColor:[UIColor whiteColor]];
+    [self.backButton setImage:backImage forState:UIControlStateNormal];
     [self.backButton addTarget:self action:@selector(back) forControlEvents:UIControlEventTouchUpInside];
     [self.backButton setFrame:CGRectMake(0, 0, 24, 24)];
     UIBarButtonItem *customBackButton = [[UIBarButtonItem alloc] initWithCustomView:self.backButton];
     self.navigationItem.leftBarButtonItem = customBackButton;
 
     UIColor *buttonColor = [UIColor colorWithRed:203.0/255.0 green:22.0/255.0 blue:51.0/255.0 alpha:1.0];
-    UIBarButtonItem *resetButton = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"arrow.clockwise.circle.fill"] style:UIBarButtonItemStylePlain target:self action:@selector(resetIcon)];
+    UIImage *resetImage = [UIImage systemImageNamed:@"arrow.clockwise.circle.fill"];
+    UIBarButtonItem *resetButton = [[UIBarButtonItem alloc] initWithImage:resetImage style:UIBarButtonItemStylePlain target:self action:@selector(resetIcon)];
+    resetButton.tintColor = buttonColor;
     
-    UIBarButtonItem *saveButton = [[UIBarButtonItem alloc] initWithTitle:@"Save" style:UIBarButtonItemStylePlain target:self action:@selector(saveIcon)];
-    [saveButton setTitleTextAttributes:@{NSForegroundColorAttributeName: buttonColor, NSFontAttributeName: [UIFont fontWithName:@"YTSans-Medium" size:17]} forState:UIControlStateNormal];
-    
+    UIImage *saveImage = [UIImage systemImageNamed:@"square.and.arrow.up.fill"];
+    UIBarButtonItem *saveButton = [[UIBarButtonItem alloc] initWithImage:saveImage style:UIBarButtonItemStylePlain target:self action:@selector(saveIcon)];
+    saveButton.tintColor = buttonColor;
+
     self.navigationItem.rightBarButtonItems = @[saveButton, resetButton];
     
     NSString *path = [[NSBundle mainBundle] pathForResource:@"uYouPlus" ofType:@"bundle"];
@@ -89,6 +97,11 @@
 }
 
 - (void)resetIcon {
+    NSString *plistPath = [[NSBundle mainBundle] pathForResource:@"Info" ofType:@"plist"];
+    NSMutableDictionary *infoDict = [NSMutableDictionary dictionaryWithContentsOfFile:plistPath];
+    [infoDict removeObjectForKey:@"ALTAppIcon"];
+    [infoDict writeToFile:plistPath atomically:YES];
+
     [[UIApplication sharedApplication] setAlternateIconName:nil completionHandler:^(NSError * _Nullable error) {
         if (error) {
             NSLog(@"Error resetting icon: %@", error.localizedDescription);
@@ -96,50 +109,61 @@
         } else {
             NSLog(@"Icon reset successfully");
             [self showAlertWithTitle:@"Success" message:@"Icon reset successfully"];
-            [self.tableView reloadData];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self.tableView reloadData];
+            });
         }
     }];
 }
 
 - (void)saveIcon {
+    if (![UIApplication sharedApplication].supportsAlternateIcons) {
+        NSLog(@"Alternate icons are not supported on this device.");
+        return;
+    }
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSString *selectedIcon = self.selectedIconIndex >= 0 ? self.appIcons[self.selectedIconIndex] : nil;
         if (selectedIcon) {
             NSString *iconName = [selectedIcon.lastPathComponent stringByDeletingPathExtension];
+           
             NSString *plistPath = [[NSBundle mainBundle] pathForResource:@"Info" ofType:@"plist"];
             NSMutableDictionary *infoDict = [NSMutableDictionary dictionaryWithContentsOfFile:plistPath];
-            NSMutableDictionary *iconsDict = [infoDict objectForKey:@"CFBundleIcons"];
+            [infoDict setObject:iconName forKey:@"ALTAppIcon"];
+            [infoDict writeToFile:plistPath atomically:YES];
             
-            if (iconsDict) {
-                NSMutableDictionary *primaryIconDict = [iconsDict objectForKey:@"CFBundlePrimaryIcon"];
-                if (primaryIconDict) {
-                    NSMutableArray *iconFiles = [primaryIconDict objectForKey:@"CFBundleIconFiles"];
-                    [iconFiles addObject:iconName];
-                    primaryIconDict[@"CFBundleIconFiles"] = iconFiles;
+            [[UIApplication sharedApplication] setAlternateIconName:iconName completionHandler:^(NSError * _Nullable error) {
+                if (error) {
+                    NSLog(@"Error setting alternate icon: %@", error.localizedDescription);
+                    [self showAlertWithTitle:@"Error" message:@"Failed to set alternate icon"];
+                } else {
+                    NSLog(@"Alternate icon set successfully");
+                    [self showAlertWithTitle:@"Success" message:@"Alternate icon set successfully"];
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [self.tableView reloadData];
+                    });
                 }
-                [infoDict setObject:iconsDict forKey:@"CFBundleIcons"];
-                [infoDict writeToFile:plistPath atomically:YES];
-                
-                [[UIApplication sharedApplication] setAlternateIconName:iconName completionHandler:^(NSError * _Nullable error) {
-                    if (error) {
-                        NSLog(@"Error setting alternate icon: %@", error.localizedDescription);
-                        [self showAlertWithTitle:@"Error" message:@"Failed to set alternate icon"];
-                    } else {
-                        NSLog(@"Alternate icon set successfully");
-                        [self showAlertWithTitle:@"Success" message:@"Alternate icon set successfully"];
-                        
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                            [self.tableView reloadData];
-                        });
-                    }
-                }];
-            } else {
-                NSLog(@"CFBundleIcons key not found in Info.plist");
-            }
+            }];
         } else {
             NSLog(@"Selected icon path is nil");
         }
     });
+}
+
+- (UIImage *)resizeImage:(UIImage *)image toSize:(CGSize)size {
+    UIGraphicsBeginImageContextWithOptions(size, NO, [UIScreen mainScreen].scale);
+    [image drawInRect:CGRectMake(0, 0, size.width, size.height)];
+    UIImage *resizedImage = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    
+    return resizedImage;
+}
+
+- (UIImage *)resizeImage:(UIImage *)image newSize:(CGSize)newSize {
+    UIGraphicsBeginImageContextWithOptions(newSize, NO, [UIScreen mainScreen].scale);
+    [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
+    UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return newImage;
 }
 
 - (void)showAlertWithTitle:(NSString *)title message:(NSString *)message {
