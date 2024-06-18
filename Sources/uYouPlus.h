@@ -25,6 +25,8 @@
 #import <YouTubeHeader/YTWatchNextResultsViewController.h>
 #import <YouTubeHeader/YTPlayerOverlay.h>
 #import <YouTubeHeader/YTPlayerOverlayProvider.h>
+#import <YouTubeHeader/YTMainAppVideoPlayerOverlayView.h>
+#import <YouTubeHeader/YTMainAppVideoPlayerOverlayViewController.h>
 #import <YouTubeHeader/YTReelWatchPlaybackOverlayView.h>
 #import <YouTubeHeader/YTInlinePlayerBarContainerView.h>
 #import <YouTubeHeader/YTInnerTubeCollectionViewController.h>
@@ -35,6 +37,7 @@
 #import <YouTubeHeader/YTIStringRun.h>
 #import <YouTubeHeader/YTWatchViewController.h>
 #import <YouTubeHeader/YTIPivotBarRenderer.h>
+#import <YouTubeHeader/YTPlayerOverlayManager.h> // Fixes uYou crash when trying to play video (#1422)
 
 // Hide buttons under the video player by @PoomSmart
 #import <YouTubeHeader/ASCollectionElement.h>
@@ -87,9 +90,7 @@
 @end
 
 // YTTapToSeek - https://github.com/bhackel/YTTapToSeek
-@interface YTMainAppVideoPlayerOverlayViewController : UIViewController
-- (CGFloat)totalTime;
-@end
+// Header has been moved to https://github.com/arichornlover/YouTubeHeader/blob/main/YTMainAppVideoPlayerOverlayViewController.h
 
 // Enable Premium logo - @bhackel
 @interface YTITopbarLogoRenderer : NSObject
@@ -140,7 +141,12 @@
 @end
 @interface YTWatchViewController (uYouEnhanced)
 @property(nonatomic, strong) YTWatchPullToFullController *pullToFullController;
-- (NSUInteger)allowedFullScreenOrientations;
+- (NSUInteger) allowedFullScreenOrientations;
+// Fullscreen to the Right (uYouEnhanced Version) - @arichornlover
+- (BOOL) fullscreen;
+- (UIInterfaceOrientationMask) supportedInterfaceOrientations;
+- (UIInterfaceOrientation) preferredInterfaceOrientationForPresentation;
+- (void)forceRightFullscreenOrientation;
 @end
 
 // uYouPlus
@@ -159,10 +165,6 @@
 
 @interface YTPlayabilityResolutionUserActionUIController : NSObject // Skips content warning before playing *some videos - @PoomSmart
 - (void)confirmAlertDidPressConfirm;
-@end
-
-@interface YTMainAppControlsOverlayView : UIView
-@property(readonly, nonatomic) YTQTMButton *watchCollapseButton;
 @end
 
 @interface YTTransportControlsButtonView : UIView
