@@ -1,7 +1,9 @@
 #import <UIKit/UIActivityViewController.h>
 #import <YouTubeHeader/YTUIUtils.h>
+#import <YouTubeHeader/YTCommonUtils.h>
 #import <YouTubeHeader/YTColorPalette.h>
 #import <YouTubeHeader/YTCommonColorPalette.h>
+#import <YouTubeHeader/GOODialogView.h>
 #import "Tweaks/protobuf/objectivec/GPBDescriptor.h"
 #import "Tweaks/protobuf/objectivec/GPBUnknownField.h"
 #import "Tweaks/protobuf/objectivec/GPBUnknownFieldSet.h"
@@ -75,6 +77,14 @@
 @property (nonatomic, assign, readwrite) BOOL hasOnAppear;
 @end
 
+@interface ELMContext : NSObject
+@property (nonatomic, strong, readwrite) UIView *fromView;
+@end
+
+@interface ELMCommandContext : NSObject
+@property (nonatomic, strong, readwrite) ELMContext *context;
+@end
+
 @interface YTIUpdateShareSheetCommand
 @property (nonatomic, assign, readwrite) BOOL hasSerializedShareEntity;
 @property (nonatomic, copy, readwrite) NSString *serializedShareEntity;
@@ -83,6 +93,11 @@
 
 @interface YTIInnertubeCommandExtensionRoot
 + (GPBExtensionDescriptor*)innertubeCommand;
+@end
+
+@interface YTAccountScopedCommandResponderEvent
+@property (nonatomic, strong, readwrite) YTICommand *command;
+@property (nonatomic, strong, readwrite) UIView *fromView;
 @end
 
 @interface YTIShareEntityEndpoint
